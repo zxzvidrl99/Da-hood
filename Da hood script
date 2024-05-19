@@ -1,0 +1,122 @@
+local player = game.Players.LocalPlayer
+local camera = game.Workspace.CurrentCamera
+local humanoid = player.Character.Humanoid
+
+local isCamLocked = false
+local camLockPosition = nil
+
+local walkSpeed = 16 -- Default walk speed
+local sprintSpeed = 32 -- Speed when sprinting
+local isSprinting = false
+
+local aimlockEnabled = false
+local aimlockTarget = nil
+
+local jumpPower = 50
+local isFlying = false
+
+local function toggleCamLock()
+    if not isCamLocked then
+        camLockPosition = camera.CFrame
+        isCamLocked = true
+    else
+        isCamLocked = false
+    end
+end
+
+local function toggleAimlock()
+    aimlockEnabled = not aimlockEnabled
+end
+
+local function toggleFlight()
+    isFlying = not isFlying
+    humanoid.PlatformStand = isFlying
+end
+
+local function updateCamera()
+    if isCamLocked then
+        camera.CFrame = camLockPosition
+    end
+    
+    if aimlockEnabled and aimlockTarget then
+        local targetPosition = aimlockTarget.Position
+        local lookVector = (targetPosition - camera.CFrame.Position).unit
+        camera.CFrame = CFrame.new(camera.CFrame.Position, camera.CFrame.Position + lookVector)
+    end
+end
+
+local function sprint()
+    isSprinting = true
+    humanoid.WalkSpeed = sprintSpeed
+end
+
+local function stopSprint()
+    isSprinting = false
+    humanoid.WalkSpeed = walkSpeed
+end
+
+-- Bind keys to actions
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.P then
+        toggleCamLock()
+    elseif input.KeyCode == Enum.KeyCode.LeftShift then
+        sprint()
+    elseif input.KeyCode == Enum.KeyCode.Q then
+        toggleAimlock()
+    elseif input.KeyCode == Enum.KeyCode.F then
+        toggleFlight()
+    elseif input.KeyCode == Enum.KeyCode.T then
+        local targetPosition = player.Character.HumanoidRootPart.Position + (camera.CFrame.LookVector * 10) -- Teleport 10 studs in front
+        player.Character.HumanoidRootPart.CFrame = CFrame.new(targetPosition)
+    end
+end)
+
+game:GetService("UserInputService").InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.LeftShift then
+        stopSprint()
+    end
+end)
+
+-- Continuously update camera position
+game:GetService("RunService").RenderStepped:Connect(function()
+    updateCamera()
+end)
+
+-- Continuously check for aimlock target
+game:GetService("RunService").Heartbeat:Connect(function()
+    if aimlockEnabled then
+        local target = nil
+        local closestDistance = math.huge
+        for _, otherPlayer in ipairs(game.Players:GetPlayers()) do
+            if otherPlayer ~= player then
+                local character = otherPlayer.Character
+                if character and character:IsDescendantOf(game.Workspace) then
+                    local distance = (player.Character.HumanoidRootPart.Position - character.HumanoidRootPart.Position).magnitude
+                    if distance < closestDistance then
+                        closestDistance = distance
+                        target = character.HumanoidRootPart
+                    end
+                end
+            end
+        end
+        aimlockTarget = target
+    end
+end)
+
+-- Walk through walls (Experimental - May not work in all games)
+game:GetService("RunService").Stepped:Connect(function()
+    if isFlying then
+        local character = player.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            local rootPart = character.HumanoidRootPart
+            for _, part in ipairs(game.Workspace:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+end)
+
+-- Adjust jump power
+humanoid.JumpPower = jumpPower
